@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Shop bảng giá linh hoạt</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="container">
+
+<header class="topbar">
+  <a class="brand" href="#">
+    <img class="brand-logo" id="brandLogo" src="" alt="logo" hidden />
+    <div class="brand-fallback" id="brandFallback">TS</div>
+    <span class="brand-name" id="brandName">Tên shop</span>
+  </a>
+  <nav class="nav"></nav>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-kicker" id="heroKicker">Premium Social Services</div>
+        <h1 id="heroTitle">Bảng giá dịch vụ</h1>
+        <p id="heroSubtitle">Chọn gói / số tháng / loại — giá đổi theo lựa chọn.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" id="heroContactBtn" href="#" target="_blank" rel="noopener">Liên hệ ngay</a>
+          <a class="btn" href="#grid">Xem sản phẩm</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="owner-box" id="ownerInfo">
+    <div class="owner-card">
+      <div class="owner-head">
+        <img class="owner-avatar" id="ownerAvatar" src="" alt="avatar" hidden />
+        <div class="owner-avatar-fallback" id="ownerAvatarFallback">L</div>
+        <div>
+          <h2 class="owner-name" id="ownerName">Luonghiii</h2>
+          <p class="owner-role" id="ownerRole">Owner</p>
+        </div>
+      </div>
+
+      <p class="owner-desc" id="ownerDesc"></p>
+
+      <div class="owner-links">
+        <a class="pill" id="ownerPhone" href="#" hidden>📞 <span></span></a>
+        <a class="pill" id="ownerEmail" href="#" hidden>✉️ <span></span></a>
+        <a class="pill" id="ownerZalo" href="#" target="_blank" rel="noopener" hidden>Zalo</a>
+        <a class="pill" id="ownerFacebook" href="#" target="_blank" rel="noopener" hidden>Facebook</a>
+        <a class="pill" id="ownerTelegram" href="#" target="_blank" rel="noopener" hidden>Telegram</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="filters">
+    <input id="searchInput" class="input" placeholder="Tìm theo tên dịch vụ (VD: ChatGPT, Netflix, CapCut...)" />
+    <div class="dropdown" id="catDropdown">
+      <button class="dropdown-btn" id="catBtn" type="button">
+        <span id="catLabel">Tất cả</span>
+        <span>▾</span>
+      </button>
+      <div class="dropdown-menu" id="catMenu" aria-hidden="true"></div>
+    </div>
+    <button class="btn" id="contactTopBtn" type="button">Liên hệ</button>
+  </section>
+
+  <div class="meta">
+    <span id="countLabel">0 sản phẩm</span>
+    <span class="muted">•</span>
+    <a class="mutedlink" id="quickContactLink" href="#" target="_blank" rel="noopener">Liên hệ nhanh</a>
+  </div>
+
+  <div class="notice" id="notice" hidden></div>
+  <section class="grid" id="grid"></section>
+
+  <footer class="footer">
+    © <span id="brandFoot">Tên shop</span>
+    <div class="footer-note" id="footerNote">
+      <div>- Nghiêm cấm sử dụng tài khoản với mục đích trái pháp luật.</div>
+      <div>- Shop không chịu trách nhiệm cho hành vi sử dụng tài nguyên sai mục đích.</div>
+    </div>
+  </footer>
+</main>
+
+</div>
+
+<div class="modal" id="orderModal" aria-hidden="true">
+  <div class="modal-backdrop" data-close="1"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">Đặt hàng / Liên hệ</div>
+        <div class="modal-sub" id="modalSub">Copy nội dung và gửi cho shop.</div>
+      </div>
+      <button class="iconbtn" id="closeModal" aria-label="Đóng">✕</button>
+    </div>
+    <textarea id="orderText" class="textarea" rows="8"></textarea>
+    <div class="modal-actions">
+      <button class="btn" id="copyBtn">Copy nội dung</button>
+      <a class="btn btn-primary" id="contactBtn" href="#" target="_blank" rel="noopener">Mở link liên hệ</a>
+    </div>
+    <div class="hint">*Bạn sửa được tên và thông tin liên hệ ở file <b>config.js</b>.</div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
