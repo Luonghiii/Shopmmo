@@ -5,11 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Lấy mã 2FA - ShopMMO</title>
   <link rel="stylesheet" href="style.css" />
-  <style>
-    .copy-success { color: #2ecc71 !important; font-size: 14px; margin-top: 5px; }
-    #resultBox { cursor: pointer; transition: transform 0.2s; }
-    #resultBox:active { transform: scale(0.95); }
-  </style>
 </head>
 <body>
 <div class="container">
@@ -22,22 +17,22 @@
   <main>
     <section class="owner-card" style="margin-top: 20px;">
       <h1 style="font-size: 24px; margin-bottom: 10px;">Công cụ lấy mã 2FA 🔐</h1>
-      <p class="owner-role">Dán mã Secret Key (Base32) vào đây để lấy mã 6 số.</p>
+      <p class="owner-role">Dán mã Secret Key vào đây rồi bấm nút lấy mã.</p>
       
       <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 15px;">
-        <input type="text" id="2faInput" class="input" style="width: 100%;" placeholder="Ví dụ: PFETP2QPCQEYYL2Y...">
+        <input type="text" id="2faInput" class="input" style="width: 100%; text-transform: uppercase;" placeholder="Dán mã (Ví dụ: PFETP2QPC...)">
         
         <button id="getOtpBtn" class="buybtn" style="width: 100%; height: 50px; font-size: 16px;">LẤY MÃ NGAY</button>
 
         <div id="resultContainer" style="display: none; border-top: 1px solid var(--stroke); padding-top: 20px;">
           <div class="label" style="text-align: center;">Chạm vào mã để copy:</div>
-          <div id="resultBox" class="codebox" style="text-align: center; font-size: 42px; font-weight: 900; color: #d4af37; letter-spacing: 5px; margin: 10px 0;">
+          <div id="resultBox" class="codebox" style="text-align: center; font-size: 42px; font-weight: 900; color: #d4af37; letter-spacing: 5px; margin: 10px 0; cursor: pointer;">
             000000
           </div>
           <div id="timer" class="muted" style="text-align: center;">
             Mã mới sau: <span id="seconds" style="font-weight: bold; color: #f5deb3;">30</span> giây
           </div>
-          <div id="copyMsg" class="copy-success" style="text-align: center; display: none;">Đã copy mã!</div>
+          <div id="copyMsg" style="text-align: center; color: #2ecc71; display: none; margin-top: 5px;">Đã copy mã!</div>
         </div>
       </div>
     </section>
@@ -45,16 +40,21 @@
 </div>
 
 <script>
-  // Simple Base32 implementation for TOTP
+  // Tối ưu bộ giải mã Base32 để tránh lỗi "Mã không hợp lệ"
   const Base32 = {
     alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
     decode(str) {
-      str = str.toUpperCase().replace(/\s/g, "");
-      let bits = "", res = [];
+      // Làm sạch mã: Viết hoa, xóa khoảng trắng, xóa dấu gạch ngang, xóa dấu bằng dư thừa
+      str = str.toUpperCase().replace(/[^A-Z2-7]/g, "");
+      if (!str) return null;
+      
+      let bits = "";
       for (let i = 0; i < str.length; i++) {
         let val = this.alphabet.indexOf(str[i]);
         if (val >= 0) bits += val.toString(2).padStart(5, '0');
       }
+      
+      let res = [];
       for (let i = 0; i + 8 <= bits.length; i += 8) {
         res.push(parseInt(bits.substr(i, 8), 2));
       }
@@ -65,20 +65,33 @@
   async function getTOTP(secret) {
     try {
       const key = Base32.decode(secret);
+      if (!key || key.length === 0) return null;
+
       const epoch = Math.floor(Date.now() / 1000);
       const time = Math.floor(epoch / 30);
+      
+      // Tạo message buffer (8 bytes)
       const msg = new Uint8Array(8);
+      let t = time;
       for (let i = 7; i >= 0; i--) {
-        msg[i] = time & 0xff;
-        time >>>= 8;
+        msg[i] = t & 0xff;
+        t = Math.floor(t / 256);
       }
-      const cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+
+      const cryptoKey = await crypto.subtle.importKey(
+        "raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
+      );
       const signature = await crypto.subtle.sign("HMAC", cryptoKey, msg);
       const data = new Uint8Array(signature);
+      
       const offset = data[data.length - 1] & 0xf;
       const otp = ((data[offset] & 0x7f) << 24 | (data[offset + 1] & 0xff) << 16 | (data[offset + 2] & 0xff) << 8 | (data[offset + 3] & 0xff)) % 1000000;
+      
       return otp.toString().padStart(6, '0');
-    } catch (e) { return null; }
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
   }
 
   const input = document.getElementById('2faInput');
@@ -89,32 +102,28 @@
   const copyMsg = document.getElementById('copyMsg');
 
   async function updateOTP() {
-    const secret = input.value.trim();
-    if (!secret) return;
-    const code = await getTOTP(secret);
+    const code = await getTOTP(input.value);
     if (code) {
       resultBox.textContent = code;
       resultContainer.style.display = 'block';
     } else {
-      alert("Mã Secret Key không hợp lệ!");
+      alert("Lỗi: Mã Secret Key không đúng định dạng Base32!");
     }
   }
 
   btn.addEventListener('click', updateOTP);
 
-  // Click để copy
   resultBox.addEventListener('click', () => {
     navigator.clipboard.writeText(resultBox.textContent);
     copyMsg.style.display = 'block';
     setTimeout(() => { copyMsg.style.display = 'none'; }, 2000);
   });
 
-  // Đếm ngược giây
   setInterval(() => {
     const timeLeft = 30 - (Math.floor(Date.now() / 1000) % 30);
     secondsEl.textContent = timeLeft;
     if (timeLeft === 30 && resultContainer.style.display === 'block') {
-      updateOTP(); // Tự động làm mới mã khi hết 30s
+      updateOTP();
     }
   }, 1000);
 </script>
