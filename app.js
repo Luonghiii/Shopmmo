@@ -1,11 +1,12 @@
 (() => {
+// Hàm chuẩn hóa chuỗi cực mạnh: Xóa dấu, viết thường và XÓA SẠCH khoảng trắng
 function norm(s){
   return String(s || "")
     .trim()
     .toLowerCase()
     .replace(/đ/g, "d")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ");
+    .replace(/\s+/g, ""); // Xóa sạch tất cả khoảng trắng để so khớp chính xác
 }
 
 function buildCsvUrl(sheetId, gid){
@@ -37,7 +38,10 @@ function parseCSV(text){
 
 function pickIdx(hmap, wanted){
   const w = norm(wanted);
-  for(const [k, idx] of hmap.entries()) if(k === w) return idx;
+  // Duyệt qua map để tìm key đã được chuẩn hóa
+  for(const [k, idx] of hmap.entries()) {
+    if(norm(k) === w) return idx;
+  }
   return -1;
 }
 
@@ -376,7 +380,7 @@ async function load(){
     const rows = parseCSV(csv);
     if(rows.length < 2) throw new Error("Sheet rỗng.");
 
-    const headers = rows[0].map(h => norm(h));
+    const headers = rows[0];
     const hmap = new Map(headers.map((h, i) => [h, i]));
 
     const col = SHEET_CONFIG.columns || {};
