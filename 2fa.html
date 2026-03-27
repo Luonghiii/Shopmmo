@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lấy mã 2FA - ShopMMO</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsOTP/2.0.1/jsOTP.min.js"></script>
+</head>
+<body>
+<div class="container">
+  <header class="topbar">
+    <a class="brand" href="index.html">
+      <span class="brand-name">← Quay lại Shop</span>
+    </a>
+  </header>
+
+  <main>
+    <section class="owner-card" style="margin-top: 20px;">
+      <h1 style="font-size: 24px; margin-bottom: 10px;">Công cụ lấy mã 2FA 🔐</h1>
+      <p class="owner-role">Dán mã Secret Key (2FA) vào ô dưới đây để lấy mã 6 số.</p>
+      
+      <div style="margin-top: 20px;">
+        <input type="text" id="2faInput" class="input" style="width: 100%; margin-bottom: 15px;" placeholder="Ví dụ: JBSWY3DPEHPK3PXP">
+        <div id="resultBox" class="codebox" style="text-align: center; font-size: 32px; font-weight: 900; display: none; color: #d4af37;">
+          000000
+        </div>
+        <div id="timer" class="muted" style="text-align: center; margin-top: 10px; display: none;">
+          Mã sẽ hết hạn sau: <span id="seconds">30</span>s
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  const input = document.getElementById('2faInput');
+  const resultBox = document.getElementById('resultBox');
+  const timer = document.getElementById('timer');
+  const secondsEl = document.getElementById('seconds');
+  
+  const totp = new jsOTP.totp();
+
+  function update2FA() {
+    const secret = input.value.replace(/\s+/g, ''); // Xóa khoảng trắng
+    if (secret.length >= 16) {
+      try {
+        const code = totp.getOtp(secret);
+        resultBox.textContent = code;
+        resultBox.style.display = 'block';
+        timer.style.display = 'block';
+        
+        // Tính toán thời gian còn lại (chu kỳ 30 giây)
+        const epoch = Math.round(new Date().getTime() / 1000.0);
+        secondsEl.textContent = 30 - (epoch % 30);
+      } catch (err) {
+        resultBox.textContent = "Mã sai định dạng";
+      }
+    } else {
+      resultBox.style.display = 'none';
+      timer.style.display = 'none';
+    }
+  }
+
+  input.addEventListener('input', update2FA);
+  // Tự động cập nhật mỗi giây
+  setInterval(update2FA, 1000);
+</script>
+</body>
+</html>
