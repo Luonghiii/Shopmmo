@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Lấy mã 2FA - ShopMMO</title>
   <link rel="stylesheet" href="style.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsOTP/2.0.1/jsOTP.min.js"></script>
+  <style>
+    .copy-success { color: #2ecc71 !important; font-size: 14px; margin-top: 5px; }
+    #resultBox { cursor: pointer; transition: transform 0.2s; }
+    #resultBox:active { transform: scale(0.95); }
+  </style>
 </head>
 <body>
 <div class="container">
@@ -18,20 +22,22 @@
   <main>
     <section class="owner-card" style="margin-top: 20px;">
       <h1 style="font-size: 24px; margin-bottom: 10px;">Công cụ lấy mã 2FA 🔐</h1>
-      <p class="owner-role">Dán mã Secret Key vào ô dưới đây rồi bấm nút lấy mã.</p>
+      <p class="owner-role">Dán mã Secret Key (Base32) vào đây để lấy mã 6 số.</p>
       
-      <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
-        <input type="text" id="2faInput" class="input" style="width: 100%;" placeholder="Dán mã vào đây...">
+      <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 15px;">
+        <input type="text" id="2faInput" class="input" style="width: 100%;" placeholder="Ví dụ: PFETP2QPCQEYYL2Y...">
         
-        <button id="getOtpBtn" class="buybtn" style="width: 100%; height: 45px;">Lấy mã ngay</button>
+        <button id="getOtpBtn" class="buybtn" style="width: 100%; height: 50px; font-size: 16px;">LẤY MÃ NGAY</button>
 
-        <div id="resultContainer" style="display: none; margin-top: 10px;">
-          <div id="resultBox" class="codebox" style="text-align: center; font-size: 38px; font-weight: 900; color: #d4af37; letter-spacing: 4px;">
+        <div id="resultContainer" style="display: none; border-top: 1px solid var(--stroke); padding-top: 20px;">
+          <div class="label" style="text-align: center;">Chạm vào mã để copy:</div>
+          <div id="resultBox" class="codebox" style="text-align: center; font-size: 42px; font-weight: 900; color: #d4af37; letter-spacing: 5px; margin: 10px 0;">
             000000
           </div>
-          <div id="timer" class="muted" style="text-align: center; margin-top: 10px;">
-            Mã sẽ đổi sau: <span id="seconds" style="font-weight: bold;">30</span>s
+          <div id="timer" class="muted" style="text-align: center;">
+            Mã mới sau: <span id="seconds" style="font-weight: bold; color: #f5deb3;">30</span> giây
           </div>
+          <div id="copyMsg" class="copy-success" style="text-align: center; display: none;">Đã copy mã!</div>
         </div>
       </div>
     </section>
@@ -39,56 +45,76 @@
 </div>
 
 <script>
+  // Simple Base32 implementation for TOTP
+  const Base32 = {
+    alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
+    decode(str) {
+      str = str.toUpperCase().replace(/\s/g, "");
+      let bits = "", res = [];
+      for (let i = 0; i < str.length; i++) {
+        let val = this.alphabet.indexOf(str[i]);
+        if (val >= 0) bits += val.toString(2).padStart(5, '0');
+      }
+      for (let i = 0; i + 8 <= bits.length; i += 8) {
+        res.push(parseInt(bits.substr(i, 8), 2));
+      }
+      return new Uint8Array(res);
+    }
+  };
+
+  async function getTOTP(secret) {
+    try {
+      const key = Base32.decode(secret);
+      const epoch = Math.floor(Date.now() / 1000);
+      const time = Math.floor(epoch / 30);
+      const msg = new Uint8Array(8);
+      for (let i = 7; i >= 0; i--) {
+        msg[i] = time & 0xff;
+        time >>>= 8;
+      }
+      const cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+      const signature = await crypto.subtle.sign("HMAC", cryptoKey, msg);
+      const data = new Uint8Array(signature);
+      const offset = data[data.length - 1] & 0xf;
+      const otp = ((data[offset] & 0x7f) << 24 | (data[offset + 1] & 0xff) << 16 | (data[offset + 2] & 0xff) << 8 | (data[offset + 3] & 0xff)) % 1000000;
+      return otp.toString().padStart(6, '0');
+    } catch (e) { return null; }
+  }
+
   const input = document.getElementById('2faInput');
   const btn = document.getElementById('getOtpBtn');
   const resultContainer = document.getElementById('resultContainer');
   const resultBox = document.getElementById('resultBox');
   const secondsEl = document.getElementById('seconds');
-  
-  // Khởi tạo thư viện jsOTP
-  const totp = new jsOTP.totp();
+  const copyMsg = document.getElementById('copyMsg');
 
-  function generate2FA() {
-    const secret = input.value.trim().replace(/\s+/g, '');
-    
-    if (secret.length < 8) {
-      alert("Mã quá ngắn hoặc không đúng định dạng!");
-      return;
-    }
-
-    try {
-      const code = totp.getOtp(secret);
+  async function updateOTP() {
+    const secret = input.value.trim();
+    if (!secret) return;
+    const code = await getTOTP(secret);
+    if (code) {
       resultBox.textContent = code;
       resultContainer.style.display = 'block';
-      updateTimer();
-    } catch (err) {
-      alert("Lỗi: Không thể giải mã. Hãy kiểm tra lại mã Secret Key!");
-      console.error(err);
+    } else {
+      alert("Mã Secret Key không hợp lệ!");
     }
   }
 
-  function updateTimer() {
-    const epoch = Math.round(new Date().getTime() / 1000.0);
-    const timeLeft = 30 - (epoch % 30);
-    secondsEl.textContent = timeLeft;
-    
-    // Nếu còn dưới 5s thì đổi màu đỏ cảnh báo
-    secondsEl.style.color = timeLeft <= 5 ? '#ff4d4d' : '#d4af37';
-    
-    // Nếu mã tự động đổi trong khi đang mở, cập nhật luôn mã mới
-    if (timeLeft === 30) {
-        const secret = input.value.trim().replace(/\s+/g, '');
-        if(secret) resultBox.textContent = totp.getOtp(secret);
-    }
-  }
+  btn.addEventListener('click', updateOTP);
 
-  // Click nút để lấy mã
-  btn.addEventListener('click', generate2FA);
+  // Click để copy
+  resultBox.addEventListener('click', () => {
+    navigator.clipboard.writeText(resultBox.textContent);
+    copyMsg.style.display = 'block';
+    setTimeout(() => { copyMsg.style.display = 'none'; }, 2000);
+  });
 
-  // Cập nhật giây đếm ngược mỗi giây
+  // Đếm ngược giây
   setInterval(() => {
-    if (resultContainer.style.display === 'block') {
-      updateTimer();
+    const timeLeft = 30 - (Math.floor(Date.now() / 1000) % 30);
+    secondsEl.textContent = timeLeft;
+    if (timeLeft === 30 && resultContainer.style.display === 'block') {
+      updateOTP(); // Tự động làm mới mã khi hết 30s
     }
   }, 1000);
 </script>
