@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Lấy mã 2FA - ShopMMO</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsOTP/2.0.1/jsOTP.min.js"></script>
@@ -18,15 +18,20 @@
   <main>
     <section class="owner-card" style="margin-top: 20px;">
       <h1 style="font-size: 24px; margin-bottom: 10px;">Công cụ lấy mã 2FA 🔐</h1>
-      <p class="owner-role">Dán mã Secret Key (2FA) vào ô dưới đây để lấy mã 6 số.</p>
+      <p class="owner-role">Dán mã Secret Key vào ô dưới đây rồi bấm nút lấy mã.</p>
       
-      <div style="margin-top: 20px;">
-        <input type="text" id="2faInput" class="input" style="width: 100%; margin-bottom: 15px;" placeholder="Ví dụ: JBSWY3DPEHPK3PXP">
-        <div id="resultBox" class="codebox" style="text-align: center; font-size: 32px; font-weight: 900; display: none; color: #d4af37;">
-          000000
-        </div>
-        <div id="timer" class="muted" style="text-align: center; margin-top: 10px; display: none;">
-          Mã sẽ hết hạn sau: <span id="seconds">30</span>s
+      <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
+        <input type="text" id="2faInput" class="input" style="width: 100%;" placeholder="Dán mã vào đây...">
+        
+        <button id="getOtpBtn" class="buybtn" style="width: 100%; height: 45px;">Lấy mã ngay</button>
+
+        <div id="resultContainer" style="display: none; margin-top: 10px;">
+          <div id="resultBox" class="codebox" style="text-align: center; font-size: 38px; font-weight: 900; color: #d4af37; letter-spacing: 4px;">
+            000000
+          </div>
+          <div id="timer" class="muted" style="text-align: center; margin-top: 10px;">
+            Mã sẽ đổi sau: <span id="seconds" style="font-weight: bold;">30</span>s
+          </div>
         </div>
       </div>
     </section>
@@ -35,36 +40,57 @@
 
 <script>
   const input = document.getElementById('2faInput');
+  const btn = document.getElementById('getOtpBtn');
+  const resultContainer = document.getElementById('resultContainer');
   const resultBox = document.getElementById('resultBox');
-  const timer = document.getElementById('timer');
   const secondsEl = document.getElementById('seconds');
   
+  // Khởi tạo thư viện jsOTP
   const totp = new jsOTP.totp();
 
-  function update2FA() {
-    const secret = input.value.replace(/\s+/g, ''); // Xóa khoảng trắng
-    if (secret.length >= 16) {
-      try {
-        const code = totp.getOtp(secret);
-        resultBox.textContent = code;
-        resultBox.style.display = 'block';
-        timer.style.display = 'block';
-        
-        // Tính toán thời gian còn lại (chu kỳ 30 giây)
-        const epoch = Math.round(new Date().getTime() / 1000.0);
-        secondsEl.textContent = 30 - (epoch % 30);
-      } catch (err) {
-        resultBox.textContent = "Mã sai định dạng";
-      }
-    } else {
-      resultBox.style.display = 'none';
-      timer.style.display = 'none';
+  function generate2FA() {
+    const secret = input.value.trim().replace(/\s+/g, '');
+    
+    if (secret.length < 8) {
+      alert("Mã quá ngắn hoặc không đúng định dạng!");
+      return;
+    }
+
+    try {
+      const code = totp.getOtp(secret);
+      resultBox.textContent = code;
+      resultContainer.style.display = 'block';
+      updateTimer();
+    } catch (err) {
+      alert("Lỗi: Không thể giải mã. Hãy kiểm tra lại mã Secret Key!");
+      console.error(err);
     }
   }
 
-  input.addEventListener('input', update2FA);
-  // Tự động cập nhật mỗi giây
-  setInterval(update2FA, 1000);
+  function updateTimer() {
+    const epoch = Math.round(new Date().getTime() / 1000.0);
+    const timeLeft = 30 - (epoch % 30);
+    secondsEl.textContent = timeLeft;
+    
+    // Nếu còn dưới 5s thì đổi màu đỏ cảnh báo
+    secondsEl.style.color = timeLeft <= 5 ? '#ff4d4d' : '#d4af37';
+    
+    // Nếu mã tự động đổi trong khi đang mở, cập nhật luôn mã mới
+    if (timeLeft === 30) {
+        const secret = input.value.trim().replace(/\s+/g, '');
+        if(secret) resultBox.textContent = totp.getOtp(secret);
+    }
+  }
+
+  // Click nút để lấy mã
+  btn.addEventListener('click', generate2FA);
+
+  // Cập nhật giây đếm ngược mỗi giây
+  setInterval(() => {
+    if (resultContainer.style.display === 'block') {
+      updateTimer();
+    }
+  }, 1000);
 </script>
 </body>
 </html>
