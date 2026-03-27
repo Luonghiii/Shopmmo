@@ -17,10 +17,10 @@
   <main>
     <section class="owner-card" style="margin-top: 20px;">
       <h1 style="font-size: 24px; margin-bottom: 10px;">Công cụ lấy mã 2FA 🔐</h1>
-      <p class="owner-role">Dán mã Secret Key vào đây rồi bấm nút lấy mã.</p>
+      <p class="owner-role">Dán mã Secret Key hoặc dùng link chứa mã để lấy 2FA.</p>
       
       <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 15px;">
-        <input type="text" id="2faInput" class="input" style="width: 100%; text-transform: uppercase;" placeholder="Dán mã (Ví dụ: PFETP2QPC...)">
+        <input type="text" id="2faInput" class="input" style="width: 100%; text-transform: uppercase;" placeholder="Dán mã vào đây...">
         
         <button id="getOtpBtn" class="buybtn" style="width: 100%; height: 50px; font-size: 16px;">LẤY MÃ NGAY</button>
 
@@ -40,20 +40,17 @@
 </div>
 
 <script>
-  // Tối ưu bộ giải mã Base32 để tránh lỗi "Mã không hợp lệ"
+  // Logic giải mã 2FA (Base32 + TOTP)
   const Base32 = {
     alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",
     decode(str) {
-      // Làm sạch mã: Viết hoa, xóa khoảng trắng, xóa dấu gạch ngang, xóa dấu bằng dư thừa
       str = str.toUpperCase().replace(/[^A-Z2-7]/g, "");
       if (!str) return null;
-      
       let bits = "";
       for (let i = 0; i < str.length; i++) {
         let val = this.alphabet.indexOf(str[i]);
         if (val >= 0) bits += val.toString(2).padStart(5, '0');
       }
-      
       let res = [];
       for (let i = 0; i + 8 <= bits.length; i += 8) {
         res.push(parseInt(bits.substr(i, 8), 2));
@@ -66,32 +63,18 @@
     try {
       const key = Base32.decode(secret);
       if (!key || key.length === 0) return null;
-
       const epoch = Math.floor(Date.now() / 1000);
       const time = Math.floor(epoch / 30);
-      
-      // Tạo message buffer (8 bytes)
       const msg = new Uint8Array(8);
       let t = time;
-      for (let i = 7; i >= 0; i--) {
-        msg[i] = t & 0xff;
-        t = Math.floor(t / 256);
-      }
-
-      const cryptoKey = await crypto.subtle.importKey(
-        "raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
-      );
+      for (let i = 7; i >= 0; i--) { msg[i] = t & 0xff; t = Math.floor(t / 256); }
+      const cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
       const signature = await crypto.subtle.sign("HMAC", cryptoKey, msg);
       const data = new Uint8Array(signature);
-      
       const offset = data[data.length - 1] & 0xf;
       const otp = ((data[offset] & 0x7f) << 24 | (data[offset + 1] & 0xff) << 16 | (data[offset + 2] & 0xff) << 8 | (data[offset + 3] & 0xff)) % 1000000;
-      
       return otp.toString().padStart(6, '0');
-    } catch (e) {
-      console.error(e);
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
   const input = document.getElementById('2faInput');
@@ -102,14 +85,26 @@
   const copyMsg = document.getElementById('copyMsg');
 
   async function updateOTP() {
-    const code = await getTOTP(input.value);
+    const val = input.value.trim();
+    if (!val) return;
+    const code = await getTOTP(val);
     if (code) {
       resultBox.textContent = code;
       resultContainer.style.display = 'block';
-    } else {
-      alert("Lỗi: Mã Secret Key không đúng định dạng Base32!");
     }
   }
+
+  // --- PHẦN MỚI: TỰ ĐỘNG LẤY MÃ TỪ URL ---
+  window.onload = async () => {
+    // Lấy phần sau dấu ? trong URL
+    const urlParams = window.location.search.substring(1); 
+    if (urlParams) {
+      // Giải mã ký tự đặc biệt (như %20 là dấu cách)
+      const cleanSecret = decodeURIComponent(urlParams).trim();
+      input.value = cleanSecret; // Điền vào ô nhập
+      await updateOTP(); // Tự động chạy lấy mã
+    }
+  };
 
   btn.addEventListener('click', updateOTP);
 
