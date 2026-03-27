@@ -6,7 +6,7 @@ function norm(s){
     .toLowerCase()
     .replace(/đ/g, "d")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, ""); // Xóa sạch tất cả khoảng trắng để so khớp chính xác
+    .replace(/\s+/g, ""); 
 }
 
 function buildCsvUrl(sheetId, gid){
@@ -38,7 +38,6 @@ function parseCSV(text){
 
 function pickIdx(hmap, wanted){
   const w = norm(wanted);
-  // Duyệt qua map để tìm key đã được chuẩn hóa
   for(const [k, idx] of hmap.entries()) {
     if(norm(k) === w) return idx;
   }
@@ -52,7 +51,7 @@ function viPrice(x){
   if(!cleaned) return null;
   const n = Number(cleaned);
   if(!Number.isFinite(n)) return null;
-  return new Intl.NumberFormat("vi-VN").format(n) + "vnd";
+  return new Intl.NumberFormat("vi-VN").format(n) + "đ";
 }
 
 function initialsOf(name){
@@ -175,7 +174,6 @@ function setCatOpen(open){
   catOpen = open;
   if(catMenu){
     catMenu.style.display = open ? "block" : "none";
-    catMenu.setAttribute("aria-hidden", open ? "false" : "true");
   }
 }
 
@@ -203,7 +201,7 @@ document.addEventListener("click", (e) => {
 if(closeModalBtn) closeModalBtn.addEventListener("click", closeModal);
 if(modal){
   modal.addEventListener("click", (e) => {
-    if(e.target && e.target.dataset && e.target.dataset.close) closeModal();
+    if(e.target === modal || (e.target.dataset && e.target.dataset.close)) closeModal();
   });
 }
 
@@ -211,8 +209,8 @@ if(copyBtn){
   copyBtn.addEventListener("click", async () => {
     try{
       await navigator.clipboard.writeText(orderText.value);
-      copyBtn.textContent = "Đã copy";
-      setTimeout(() => copyBtn.textContent = "Copy nội dung", 1200);
+      copyBtn.textContent = "Đã copy ✔";
+      setTimeout(() => copyBtn.textContent = "Copy nội dung", 1500);
     }catch{
       orderText.select();
       document.execCommand("copy");
@@ -290,11 +288,6 @@ function render(){
     f1.innerHTML = `<div class="label">Gói</div>`;
     const selPack = document.createElement("select");
     selPack.className = "select";
-    p.packages.forEach(v => {
-      const o = document.createElement("option");
-      o.value = v; o.textContent = v;
-      selPack.appendChild(o);
-    });
     f1.appendChild(selPack);
 
     const f2 = document.createElement("div");
@@ -302,11 +295,6 @@ function render(){
     f2.innerHTML = `<div class="label">Số tháng</div>`;
     const selMonths = document.createElement("select");
     selMonths.className = "select";
-    p.months.forEach(v => {
-      const o = document.createElement("option");
-      o.value = v; o.textContent = v;
-      selMonths.appendChild(o);
-    });
     f2.appendChild(selMonths);
 
     const f3 = document.createElement("div");
@@ -314,11 +302,6 @@ function render(){
     f3.innerHTML = `<div class="label">Loại</div>`;
     const selType = document.createElement("select");
     selType.className = "select";
-    p.types.forEach(v => {
-      const o = document.createElement("option");
-      o.value = v; o.textContent = v;
-      selType.appendChild(o);
-    });
     f3.appendChild(selType);
 
     const pricebar = document.createElement("div");
@@ -330,6 +313,47 @@ function render(){
     const btn = document.createElement("button");
     btn.className = "buybtn";
 
+    // --- LOGIC LỌC THÔNG MINH (CASCADING DROPDOWNS) ---
+    
+    // 1. Khi đổi Gói -> Cập nhật Số tháng
+    function updateMonths() {
+      const selectedPack = selPack.value;
+      const validRows = p.rows.filter(r => r.pack === selectedPack);
+      const uniqueMonths = [...new Set(validRows.map(r => r.months).filter(Boolean))];
+
+      const currentMonth = selMonths.value;
+      selMonths.innerHTML = ""; // Xóa danh sách tháng cũ
+      uniqueMonths.forEach(m => {
+        selMonths.add(new Option(m, m));
+      });
+      
+      // Giữ nguyên tháng nếu tháng cũ có trong danh sách mới, nếu không chọn tháng đầu tiên
+      if (uniqueMonths.includes(currentMonth)) selMonths.value = currentMonth;
+      else if (uniqueMonths.length > 0) selMonths.value = uniqueMonths[0];
+
+      updateTypes(); // Chạy tiếp xuống lọc Loại
+    }
+
+    // 2. Khi đổi Số tháng -> Cập nhật Loại
+    function updateTypes() {
+      const selectedPack = selPack.value;
+      const selectedMonth = selMonths.value;
+      const validRows = p.rows.filter(r => r.pack === selectedPack && r.months === selectedMonth);
+      const uniqueTypes = [...new Set(validRows.map(r => r.type).filter(Boolean))];
+
+      const currentType = selType.value;
+      selType.innerHTML = ""; // Xóa danh sách loại cũ
+      uniqueTypes.forEach(t => {
+        selType.add(new Option(t, t));
+      });
+
+      if (uniqueTypes.includes(currentType)) selType.value = currentType;
+      else if (uniqueTypes.length > 0) selType.value = uniqueTypes[0];
+
+      updatePrice(); // Chạy tiếp xuống cập nhật Giá
+    }
+
+    // 3. Cập nhật Giá cuối cùng
     function updatePrice(){
       const pack = selPack.value;
       const months = selMonths.value;
@@ -339,7 +363,7 @@ function render(){
 
       if(pretty){
         priceEl.innerHTML = `<small>Giá</small><br>${pretty}`;
-        btn.textContent = "Mua";
+        btn.textContent = "Mua ngay";
       }else{
         priceEl.innerHTML = `<small>Giá</small><br>Liên hệ`;
         btn.textContent = "Liên hệ";
@@ -351,10 +375,20 @@ function render(){
       };
     }
 
-    selPack.addEventListener("change", updatePrice);
-    selMonths.addEventListener("change", updatePrice);
+    // --- KHỞI TẠO LẦN ĐẦU ---
+    // Đổ dữ liệu vào ô Gói đầu tiên
+    const uniquePacks = [...new Set(p.rows.map(r => r.pack).filter(Boolean))];
+    uniquePacks.forEach(pk => {
+      selPack.add(new Option(pk, pk));
+    });
+
+    // Gắn sự kiện lắng nghe khi người dùng bấm chọn
+    selPack.addEventListener("change", updateMonths);
+    selMonths.addEventListener("change", updateTypes);
     selType.addEventListener("change", updatePrice);
-    updatePrice();
+
+    // Kích hoạt chuỗi lọc lần đầu tiên khi vừa load web
+    updateMonths(); 
 
     pricebar.appendChild(priceEl);
     pricebar.appendChild(btn);
@@ -426,12 +460,8 @@ async function load(){
       if(!g.image && it.image) g.image = it.image;
     }
 
-    allProducts = [...by.values()].map(g => {
-      const packages = [...new Set(g.rows.map(r => r.pack).filter(Boolean))];
-      const months = [...new Set(g.rows.map(r => r.months).filter(Boolean))];
-      const types = [...new Set(g.rows.map(r => r.type).filter(Boolean))];
-      return { ...g, packages, months, types };
-    }).sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    // Chuyển Map thành mảng để render
+    allProducts = [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "vi"));
 
     buildCategoryMenu(allProducts);
     render();
